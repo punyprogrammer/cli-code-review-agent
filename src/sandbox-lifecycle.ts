@@ -42,8 +42,5 @@ export async function runSandboxLifecycle(
   }
 }
 const REPO_URL = "https://github.com/vercel/examples";
-async function main() {
-  const result = await runSandboxLifecycle(REPO_URL);
-  console.log(result);
-}
-main();
+
+

@@ -13,15 +13,23 @@ program
   .action(async (repoUrl: string) => {
     if (!isValidGitHubRepoUrl(repoUrl)) {
       console.log("Invalid GitHub repository URL");
-      process.exit(1);
+      process.exitCode = 2;
+      return;
     }
-
     console.log(`Would review repo: ${repoUrl}`);
-    const result = await runSandboxLifecycle(repoUrl);
-    console.log(`Sandbox: ${result.sandboxName}`);
-    console.log(`Clone exit code: ${result.cloneExitCode}`);
-    console.log(`Files:\n${result.files}`);
-    console.log(`README preview:\n${result.readmePreview}`);
+    try {
+      const result = await runSandboxLifecycle(repoUrl);
+      console.log(`Sandbox: ${result.sandboxName}`);
+      console.log(`Clone exit code: ${result.cloneExitCode}`);
+      console.log(`Files:\n${result.files}`);
+      console.log(`README preview:\n${result.readmePreview}`);
+    } catch (error) {
+      console.error(
+        "Review failed:",
+        error instanceof Error ? error.message : error,
+      );
+      process.exitCode = 1;
+    }
   });
 // Parse the arguments and run the command
 await program.parseAsync(process.argv);
