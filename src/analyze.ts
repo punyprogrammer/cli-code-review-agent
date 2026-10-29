@@ -1,4 +1,4 @@
-import { generateText } from "ai";
+import { generateText, Output } from "ai";
 import z from "zod";
 
 export const findingSchema = z.object({
@@ -21,30 +21,38 @@ export async function analyzeWithPromptV1(source: string): Promise<string> {
   });
   return result.text;
 }
-const sample: Review = {
-  overallRisk: "medium",
-  findings: [
-    {
-      severity: "high",
-      category: "security",
-      file: "src/auth.ts",
-      summary: "Hardcoded password",
-      recommendation: "Use bcrypt and an env var",
-    },
-  ],
-};
+export async function analyzeRepository(
+  files: Array<{ path: string; content: string }>,
+): Promise<Review> {
+  const result = await generateText({
+    model: "openai/gpt-5.3-codex",
+    instructions: [
+      "You are a senior application security and code quality reviewer.",
+      "Return only findings that are directly supported by the provided source.",
+      "Prefer precise, actionable recommendations over generic advice.",
+      "If there are no findings, return an empty findings array.",
+    ].join("\n"),
+    output: Output.object({ schema: reviewSchema }),
+    prompt: files.map((f) => `FILE: ${f.path}\n${f.content}`).join("\n"),
+  });
 
-console.log(reviewSchema.parse(sample));
+  return result.output;
+}
 async function main() {
-  const source = `
-      export function login(user: string, password: string) {
-        if (password === 'admin') return true;
-        return false;
-      }
-    `;
+  const files = [
+    {
+      path: "src/auth.ts",
+      content: `
+        export function login(user: string, password: string) {
+          if (password === 'admin') return true;
+          return false;
+        }
+      `,
+    },
+  ];
 
-  const review = await analyzeWithPromptV1(source);
-  console.log(review);
+  const review = await analyzeRepository(files);
+  console.log(JSON.stringify(review, null, 2));
 }
 
 main();
