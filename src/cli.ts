@@ -20,6 +20,7 @@ program
     console.log(`Would review repo: ${repoUrl}`);
     try {
       const lifecycle = await runSandboxLifecycle(repoUrl);
+      console.log("TEST RESULT ", lifecycle.testResult);
       console.log(`Sandbox: ${lifecycle.sandboxName}`);
       console.log(`Collected ${lifecycle.files.length} file(s) for analysis.`);
       if (lifecycle.files.length === 0) {

@@ -1,9 +1,17 @@
 import { Sandbox } from "@vercel/sandbox";
+import { cwd } from "process";
+export type TestResult = {
+  exitCode: number;
+  stderr: string;
+  stdout: string;
+};
 export type LifecycleResult = {
   sandboxName: string;
   cloneExitCode: number;
   files: Array<{ path: string; content: string }>;
+  testResult: TestResult;
 };
+
 const INTERESTING_PATHS = [
   "repo/package.json",
   "repo/src/index.ts",
@@ -48,10 +56,30 @@ export async function runSandboxLifecycle(
         });
       }
     }
+    // install dependencies
+    const install = await sandbox.runCommand({
+      cmd: "pnpm",
+      args: ["install"],
+      cwd: "repo",
+    });
+    if (install.exitCode !== 0) {
+      throw new Error(`Failed to install dependencies: ${install.stderr()}`);
+    }
+    // run the test
+    const test = await sandbox.runCommand({
+      cmd: "pnpm",
+      args: ["test"],
+      cwd: "repo",
+    });
     return {
       sandboxName: sandbox.name,
       cloneExitCode: clone.exitCode,
       files,
+      testResult: {
+        exitCode: test.exitCode,
+        stderr: await test.stderr(),
+        stdout: await test.stdout(),
+      },
     };
   } catch (error) {
     console.error(error);
@@ -60,4 +88,3 @@ export async function runSandboxLifecycle(
     await sandbox.stop();
   }
 }
-
