@@ -2,9 +2,14 @@ import { Sandbox } from "@vercel/sandbox";
 export type LifecycleResult = {
   sandboxName: string;
   cloneExitCode: number;
-  files: string;
-  readmePreview: string;
+  files: Array<{ path: string; content: string }>;
 };
+const INTERESTING_PATHS = [
+  "repo/package.json",
+  "repo/src/index.ts",
+  "repo/src/app.ts",
+  "repo/lib/auth.ts",
+];
 
 export async function runSandboxLifecycle(
   repoUrl: string,
@@ -24,15 +29,29 @@ export async function runSandboxLifecycle(
     if (clone.exitCode !== 0) {
       throw new Error(`Failed to clone repository: ${clone.stderr()}`);
     }
-    const ls = await sandbox.runCommand("ls", ["-la", "repo"]);
-    const readme = await sandbox.readFileToBuffer({ path: "repo/README.md" });
+    const files: Array<{ path: string; content: string }> = [];
+    for (const fullPath of INTERESTING_PATHS) {
+      const content = await sandbox.readFileToBuffer({ path: fullPath });
+      if (content) {
+        files.push({
+          path: fullPath.replace(/^repo\//, ""),
+          content: content.toString("utf8"),
+        });
+      }
+    }
+    for (const fullPath of INTERESTING_PATHS) {
+      const content = await sandbox.readFileToBuffer({ path: fullPath });
+      if (content) {
+        files.push({
+          path: fullPath.replace(/^repo\//, ""),
+          content: content.toString("utf8"),
+        });
+      }
+    }
     return {
       sandboxName: sandbox.name,
       cloneExitCode: clone.exitCode,
-      files: await ls.stdout(),
-      readmePreview: readme
-        ? readme.toString("utf-8").substring(0, 300)
-        : "(no README.md found)",
+      files,
     };
   } catch (error) {
     console.error(error);
@@ -41,6 +60,4 @@ export async function runSandboxLifecycle(
     await sandbox.stop();
   }
 }
-const REPO_URL = "https://github.com/vercel/examples";
-
 
