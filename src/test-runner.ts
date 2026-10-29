@@ -20,17 +20,3 @@ export function parseTestFailures(output: string): TestFinding[] {
       details: line,
     }));
 }
-const sampleOutput = `
-> repo@1.0.0 test
-> vitest run
- 
-  ✓ src/sum.test.ts (3)
-  ✕ src/auth.test.ts > login rejects empty password
-  ✕ src/auth.test.ts > login rejects short password
- 
-  Test Files  1 failed | 1 passed
-  Tests       2 failed | 3 passed
-  FAIL  src/auth.test.ts
-`;
-
-console.log(parseTestFailures(sampleOutput));
