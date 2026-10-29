@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { isValidGitHubRepoUrl } from "../utils/utilFunctions";
+import { runSandboxLifecycle } from "./sandbox-lifecycle";
 const program = new Command();
 
 program
@@ -16,6 +17,11 @@ program
     }
 
     console.log(`Would review repo: ${repoUrl}`);
+    const result = await runSandboxLifecycle(repoUrl);
+    console.log(`Sandbox: ${result.sandboxName}`);
+    console.log(`Clone exit code: ${result.cloneExitCode}`);
+    console.log(`Files:\n${result.files}`);
+    console.log(`README preview:\n${result.readmePreview}`);
   });
 // Parse the arguments and run the command
 await program.parseAsync(process.argv);
