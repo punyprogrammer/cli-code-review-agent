@@ -1,5 +1,5 @@
 import { Command } from "commander";
-
+import { isValidGitHubRepoUrl } from "../utils/utilFunctions";
 const program = new Command();
 
 program
@@ -10,6 +10,11 @@ program
   .command("review <repoUrl>")
   .description("Run a Sandbox review against a Github Repository URL")
   .action(async (repoUrl: string) => {
+    if (!isValidGitHubRepoUrl(repoUrl)) {
+      console.log("Invalid GitHub repository URL");
+      process.exit(1);
+    }
+
     console.log(`Would review repo: ${repoUrl}`);
   });
 // Parse the arguments and run the command
