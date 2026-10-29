@@ -8,7 +8,8 @@
     "node": ">=22.12"
   },
   "scripts": {
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "review": "tsx --env-file=.env src/cli.ts review"
   },
   "dependencies": {
     "@vercel/sandbox": "3.9.0",
