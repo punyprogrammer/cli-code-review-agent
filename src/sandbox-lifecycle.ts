@@ -1,5 +1,6 @@
 import { Sandbox } from "@vercel/sandbox";
 import { cwd } from "process";
+import { detectPackageManager, ensureYarn } from "./test-runner";
 export type TestResult = {
   exitCode: number;
   stderr: string;
@@ -56,21 +57,20 @@ export async function runSandboxLifecycle(
         });
       }
     }
+    const packageManager = await detectPackageManager(sandbox, "repo");
+    if (packageManager.name === "yarn") {
+      await ensureYarn(sandbox, "repo");
+    }
     // install dependencies
-    const install = await sandbox.runCommand({
-      cmd: "pnpm",
-      args: ["install"],
-      cwd: "repo",
-    });
+    const install = await sandbox.runCommand(packageManager.install);
     if (install.exitCode !== 0) {
       throw new Error(`Failed to install dependencies: ${install.stderr()}`);
     }
     // run the test
-    const test = await sandbox.runCommand({
-      cmd: "pnpm",
-      args: ["test"],
-      cwd: "repo",
-    });
+    const test = await sandbox.runCommand(packageManager.test);
+    if (test.exitCode !== 0) {
+      throw new Error(`Failed to test: ${test.stderr()}`);
+    }
     return {
       sandboxName: sandbox.name,
       cloneExitCode: clone.exitCode,
