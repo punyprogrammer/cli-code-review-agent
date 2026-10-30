@@ -8,6 +8,7 @@ export type TestResult = {
 };
 export type LifecycleResult = {
   sandboxName: string;
+  usedSnapshot: boolean;
   cloneExitCode: number;
   files: Array<{ path: string; content: string }>;
   testResult: TestResult;
@@ -19,15 +20,35 @@ const INTERESTING_PATHS = [
   "repo/src/app.ts",
   "repo/lib/auth.ts",
 ];
-
-export async function runSandboxLifecycle(
-  repoUrl: string,
-): Promise<LifecycleResult> {
+const SNAPSHOT_ID = process.env.SANDBOX_SNAPSHOT_ID;
+// create  a sandbox
+async function createSandbox(): Promise<{
+  sandbox: Sandbox;
+  usedSnapshot: boolean;
+}> {
+  if (!SNAPSHOT_ID) {
+    console.warn("SANDBOX_SNAPSHOT_ID is not set; using a default Sandbox.");
+    const sandbox = await Sandbox.create({
+      name: `repo-review-${Date.now()}`,
+      persistent: false,
+      timeout: 10 * 60 * 1000,
+    });
+    const snapshot = await sandbox.snapshot();
+    console.log(`Snapshot created: ${snapshot.snapshotId}`);
+    return { sandbox, usedSnapshot: false };
+  }
   const sandbox = await Sandbox.create({
     name: `repo-review-${Date.now()}`,
+    source: { type: "snapshot", snapshotId: SNAPSHOT_ID },
     persistent: false,
     timeout: 10 * 60 * 1000,
   });
+  return { sandbox, usedSnapshot: true };
+}
+export async function runSandboxLifecycle(
+  repoUrl: string,
+): Promise<LifecycleResult> {
+  const { sandbox, usedSnapshot } = await createSandbox();
   try {
     const clone = await sandbox.runCommand("git", [
       "clone",
@@ -73,6 +94,7 @@ export async function runSandboxLifecycle(
     }
     return {
       sandboxName: sandbox.name,
+      usedSnapshot,
       cloneExitCode: clone.exitCode,
       files,
       testResult: {
