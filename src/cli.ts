@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { runSandboxLifecycle } from "./sandbox-lifecycle";
 import { analyzeRepository } from "./analyze";
 import { parseTestFailures } from "./test-runner";
+import { printReview } from "./reporter";
 
 function isValidGitHubRepoUrl(input: string): boolean {
   return /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/.test(input);
@@ -61,18 +62,7 @@ program
         testFindings,
       };
 
-      console.log(`\nOverall risk: ${combined.overallRisk}`);
-      console.log(`AI findings: ${combined.aiFindings.length}`);
-      for (const finding of combined.aiFindings) {
-        console.log(
-          `  [${finding.severity}] ${finding.summary} (${finding.file})`,
-        );
-      }
-
-      console.log(`Test findings: ${combined.testFindings.length}`);
-      for (const finding of combined.testFindings) {
-        console.log(`  [${finding.severity}] ${finding.details}`);
-      }
+      printReview(combined);
       console.log(`\nTotal: ${Date.now() - totalStart}ms`);
     } catch (error) {
       console.error(
