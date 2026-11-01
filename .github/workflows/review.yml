@@ -1,0 +1,79 @@
+name: Review repository
+
+on:
+  workflow_call:
+    inputs:
+      repo_url:
+        description: GitHub repository to review. Defaults to the caller.
+        required: false
+        type: string
+      revision:
+        description: Commit, branch, or tag. Defaults to the pull request head.
+        required: false
+        type: string
+    secrets:
+      VERCEL_TOKEN:
+        required: true
+      VERCEL_TEAM_ID:
+        required: true
+      VERCEL_PROJECT_ID:
+        required: true
+      AI_GATEWAY_API_KEY:
+        required: true
+      SANDBOX_SNAPSHOT_ID:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout reviewer
+        uses: actions/checkout@v4
+        with:
+          repository: punyprogrammer/cli-code-review-agent
+          ref: main
+          path: reviewer
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          package_json_file: reviewer/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: reviewer/pnpm-lock.yaml
+
+      - name: Install reviewer
+        working-directory: reviewer
+        run: pnpm install --frozen-lockfile
+
+      - name: Review repository
+        working-directory: reviewer
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          SANDBOX_SNAPSHOT_ID: ${{ secrets.SANDBOX_SNAPSHOT_ID }}
+          REVIEW_GITHUB_TOKEN: ${{ github.token }}
+          INPUT_REPO_URL: ${{ inputs.repo_url }}
+          INPUT_REVISION: ${{ inputs.revision }}
+          CALLER_REPO: ${{ github.repository }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+          CI: "true"
+        run: |
+          if [ -n "$INPUT_REPO_URL" ]; then
+            REPO_URL="$INPUT_REPO_URL"
+            REVISION="$INPUT_REVISION"
+          else
+            REPO_URL="https://github.com/${CALLER_REPO}"
+            REVISION="${INPUT_REVISION:-$PR_SHA}"
+          fi
+          export REVIEW_REVISION="$REVISION"
+          pnpm exec tsx src/cli.ts review "$REPO_URL"

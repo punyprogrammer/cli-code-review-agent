@@ -16,6 +16,32 @@ vercel env pull .env
 
 `vercel env pull` writes a development OIDC token that authenticates both Sandbox and AI Gateway.
 
+## Run from another repository
+
+Other repositories call the reusable workflow in this repo. Every value to set, locally and in Actions, is listed in [docs/credentials.md](docs/credentials.md).
+
+On a pull request, the workflow reviews that pull request's commit. The sandbox clones the caller, including a private caller, with the workflow's `GITHUB_TOKEN`.
+
+```yaml
+name: Code review
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    uses: punyprogrammer/cli-code-review-agent/.github/workflows/review.yml@main
+    secrets:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+```
+
+This file has to be on `main` before another repository can call it.
+
 Then head to **Section 1: Sandbox Foundations, Your First Sandbox** in the course and start building.
 
 ## What you'll build
