@@ -20,7 +20,7 @@ vercel env pull .env
 
 Other repositories call the reusable workflow in this repo. Every value to set, locally and in Actions, is listed in [docs/credentials.md](docs/credentials.md).
 
-On a pull request, the workflow reviews that pull request's commit. The sandbox clones the caller, including a private caller, with the workflow's `GITHUB_TOKEN`.
+On a pull request, the workflow reviews that pull request's commit. The sandbox clones the caller, including a private caller, with the workflow's `GITHUB_TOKEN`. Steps to run once when the pull request is opened and to post review comments are in [docs/pr-review-comments.md](docs/pr-review-comments.md).
 
 ```yaml
 name: Code review

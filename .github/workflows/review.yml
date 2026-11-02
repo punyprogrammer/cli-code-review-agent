@@ -62,10 +62,12 @@ jobs:
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
           SANDBOX_SNAPSHOT_ID: ${{ secrets.SANDBOX_SNAPSHOT_ID }}
           REVIEW_GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
           INPUT_REPO_URL: ${{ inputs.repo_url }}
           INPUT_REVISION: ${{ inputs.revision }}
           CALLER_REPO: ${{ github.repository }}
           PR_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           CI: "true"
         run: |
           if [ -n "$INPUT_REPO_URL" ]; then
@@ -74,6 +76,11 @@ jobs:
           else
             REPO_URL="https://github.com/${CALLER_REPO}"
             REVISION="${INPUT_REVISION:-$PR_SHA}"
+            if [ -n "$PR_NUMBER" ]; then
+              gh api --paginate "repos/${CALLER_REPO}/pulls/${PR_NUMBER}/files" \
+                --jq '.[] | select(.status != "removed") | .filename' > changed-files.txt
+              export REVIEW_PATHS="$(cat changed-files.txt)"
+            fi
           fi
           export REVIEW_REVISION="$REVISION"
           pnpm exec tsx src/cli.ts review "$REPO_URL"
