@@ -20,6 +20,19 @@ const INTERESTING_PATHS = [
   "repo/src/app.ts",
   "repo/lib/auth.ts",
 ];
+
+function reviewPaths(): string[] {
+  if (process.env.REVIEW_PATHS === undefined) return INTERESTING_PATHS;
+  const paths: string[] = [];
+  for (const line of process.env.REVIEW_PATHS.split("\n")) {
+    const file = line.trim().replace(/\\/g, "/");
+    if (!file || file.startsWith("/") || file.split("/").includes("..")) {
+      continue;
+    }
+    paths.push(`repo/${file}`);
+  }
+  return paths;
+}
 const SNAPSHOT_ID = process.env.SANDBOX_SNAPSHOT_ID;
 
 function sandboxAuth():
@@ -153,23 +166,15 @@ export async function runSandboxLifecycle(
       await requireZeroExit(checkout, `Failed to check out ${revision}`);
     }
     const files: Array<{ path: string; content: string }> = [];
-    for (const fullPath of INTERESTING_PATHS) {
+    const paths = reviewPaths();
+    console.log(`Reading ${paths.length} path(s) for analysis.`);
+    for (const fullPath of paths) {
       const content = await sandbox.readFileToBuffer({ path: fullPath });
-      if (content) {
-        files.push({
-          path: fullPath.replace(/^repo\//, ""),
-          content: content.toString("utf8"),
-        });
-      }
-    }
-    for (const fullPath of INTERESTING_PATHS) {
-      const content = await sandbox.readFileToBuffer({ path: fullPath });
-      if (content) {
-        files.push({
-          path: fullPath.replace(/^repo\//, ""),
-          content: content.toString("utf8"),
-        });
-      }
+      if (!content || content.includes(0)) continue;
+      files.push({
+        path: fullPath.replace(/^repo\//, ""),
+        content: content.toString("utf8"),
+      });
     }
     const packageManager = await detectPackageManager(sandbox, "repo");
     if (packageManager.name === "yarn") {
