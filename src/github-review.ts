@@ -142,19 +142,10 @@ export async function publishPullRequestReview(
     );
   }
 
+  const diffLines = await changedFileLines(context);
   let publishedComments = 0;
   for (const comment of comments) {
-    const fileComment = await githubPost(
-      context,
-      `/repos/${context.repository}/pulls/${context.pullNumber}/comments`,
-      {
-        commit_id: context.commitId,
-        path: comment.path,
-        subject_type: comment.subject_type,
-        body: comment.body,
-        pull_request_review_id: posted.json.id,
-      },
-    );
+    const fileComment = await postFileComment(context, comment, diffLines);
     if (!fileComment.ok) {
       console.error(
         `Failed to comment on ${comment.path}: ${fileComment.status} ${fileComment.message}`,
@@ -163,7 +154,63 @@ export async function publishPullRequestReview(
     }
     publishedComments += 1;
   }
+  if (comments.length > 0 && publishedComments === 0) {
+    throw new Error("Failed to publish file comments on the pull request.");
+  }
   console.log(
     `Published a pull request review on ${context.repository}#${context.pullNumber} with ${publishedComments} file comment(s).`,
   );
+}
+
+async function postFileComment(
+  context: PullRequestContext,
+  comment: ReviewComment,
+  diffLines: Map<string, number>,
+): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
+  const path = `/repos/${context.repository}/pulls/${context.pullNumber}/comments`;
+  const onFile = await githubPost(context, path, {
+    commit_id: context.commitId,
+    path: comment.path,
+    subject_type: "file",
+    body: comment.body,
+  });
+  if (onFile.ok) return { ok: true };
+  const line = diffLines.get(comment.path);
+  if (!line) return onFile;
+  return githubPost(context, path, {
+    commit_id: context.commitId,
+    path: comment.path,
+    line,
+    side: "RIGHT",
+    body: comment.body,
+  });
+}
+
+async function changedFileLines(
+  context: PullRequestContext,
+): Promise<Map<string, number>> {
+  const lines = new Map<string, number>();
+  const response = await fetch(
+    `https://api.github.com/repos/${context.repository}/pulls/${context.pullNumber}/files?per_page=100`,
+    {
+      headers: {
+        Authorization: `Bearer ${context.token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    },
+  );
+  if (!response.ok) return lines;
+  const files = (await response.json()) as Array<{
+    filename?: string;
+    patch?: string;
+  }>;
+  for (const file of files) {
+    if (!file.filename || !file.patch) continue;
+    const match = /^@@ -\d+(?:,\d+)? \+(\d+)/m.exec(file.patch);
+    if (!match) continue;
+    const line = Number(match[1]);
+    if (line > 0) lines.set(file.filename, line);
+  }
+  return lines;
 }
