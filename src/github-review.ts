@@ -100,35 +100,24 @@ function fileComments(review: CombinedReview, changedPaths: Set<string>): {
   return { comments, unmatched };
 }
 
-async function createReview(
+async function githubPost(
   context: PullRequestContext,
-  body: string,
-  comments: ReviewComment[],
-): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
-  const response = await fetch(
-    `https://api.github.com/repos/${context.repository}/pulls/${context.pullNumber}/reviews`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${context.token}`,
-        Accept: "application/vnd.github+json",
-        "Content-Type": "application/json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-      body: JSON.stringify({
-        commit_id: context.commitId,
-        event: "COMMENT",
-        body,
-        comments,
-      }),
+  path: string,
+  payload: unknown,
+): Promise<{ ok: true; json: { id?: number } } | { ok: false; status: number; message: string }> {
+  const response = await fetch(`https://api.github.com${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${context.token}`,
+      Accept: "application/vnd.github+json",
+      "Content-Type": "application/json",
+      "X-GitHub-Api-Version": "2022-11-28",
     },
-  );
-  if (response.ok) return { ok: true };
-  return {
-    ok: false,
-    status: response.status,
-    message: redact(await response.text()),
-  };
+    body: JSON.stringify(payload),
+  });
+  const message = redact(await response.text());
+  if (!response.ok) return { ok: false, status: response.status, message };
+  return { ok: true, json: message ? (JSON.parse(message) as { id?: number }) : {} };
 }
 
 export async function publishPullRequestReview(
@@ -138,36 +127,43 @@ export async function publishPullRequestReview(
   if (!context) return;
 
   const { comments, unmatched } = fileComments(review, context.changedPaths);
-  const posted = await createReview(
+  const posted = await githubPost(
     context,
-    reviewBody(review, unmatched, "Findings outside the pull request diff:"),
-    comments,
+    `/repos/${context.repository}/pulls/${context.pullNumber}/reviews`,
+    {
+      commit_id: context.commitId,
+      event: "COMMENT",
+      body: reviewBody(review, unmatched, "Findings outside the pull request diff:"),
+    },
   );
-  if (!posted.ok && comments.length > 0 && posted.status === 422) {
-    console.error(
-      `File comments were rejected (${posted.status}). Publishing the summary instead.`,
-    );
-    const fallback = await createReview(
-      context,
-      reviewBody(review, review.aiFindings, "Findings:"),
-      [],
-    );
-    if (!fallback.ok) {
-      throw new Error(
-        `Failed to publish pull request review: ${fallback.status} ${fallback.message}`,
-      );
-    }
-    console.log(
-      `Published a pull request review on ${context.repository}#${context.pullNumber}.`,
-    );
-    return;
-  }
   if (!posted.ok) {
     throw new Error(
       `Failed to publish pull request review: ${posted.status} ${posted.message}`,
     );
   }
+
+  let publishedComments = 0;
+  for (const comment of comments) {
+    const fileComment = await githubPost(
+      context,
+      `/repos/${context.repository}/pulls/${context.pullNumber}/comments`,
+      {
+        commit_id: context.commitId,
+        path: comment.path,
+        subject_type: comment.subject_type,
+        body: comment.body,
+        pull_request_review_id: posted.json.id,
+      },
+    );
+    if (!fileComment.ok) {
+      console.error(
+        `Failed to comment on ${comment.path}: ${fileComment.status} ${fileComment.message}`,
+      );
+      continue;
+    }
+    publishedComments += 1;
+  }
   console.log(
-    `Published a pull request review on ${context.repository}#${context.pullNumber} with ${comments.length} file comment(s).`,
+    `Published a pull request review on ${context.repository}#${context.pullNumber} with ${publishedComments} file comment(s).`,
   );
 }
