@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { runSandboxLifecycle } from "./sandbox-lifecycle";
 import { analyzeRepository } from "./analyze";
 import { parseTestFailures } from "./test-runner";
+import { publishPullRequestReview } from "./github-review";
 import { printReview } from "./reporter";
 
 function isValidGitHubRepoUrl(input: string): boolean {
@@ -63,6 +64,7 @@ program
       };
 
       printReview(combined);
+      await publishPullRequestReview(combined);
       console.log(`\nTotal: ${Date.now() - totalStart}ms`);
     } catch (error) {
       console.error(
