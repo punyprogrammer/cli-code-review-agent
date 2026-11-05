@@ -15,8 +15,25 @@ type ReviewComment = {
   body: string;
 };
 
+const SEVERITY_COLOR: Record<string, string> = {
+  critical: "critical",
+  high: "red",
+  medium: "orange",
+  low: "yellow",
+};
+
+function shield(label: string, message: string, color: string): string {
+  const encode = (value: string) => value.replaceAll("-", "--").replaceAll(" ", "_");
+  return `![${label}](https://img.shields.io/badge/${encode(label)}-${encode(message)}-${color})`;
+}
+
+function severityBadge(severity: string, message: string): string {
+  return shield(severity.toUpperCase(), message, SEVERITY_COLOR[severity] ?? "lightgrey");
+}
+
 function redact(text: string): string {
   const secrets = [
+    process.env.REVIEW_BOT_TOKEN,
     process.env.GH_TOKEN,
     process.env.REVIEW_GITHUB_TOKEN,
     process.env.GITHUB_TOKEN,
@@ -33,6 +50,7 @@ function normalizePath(file: string): string {
 
 function pullRequestContext(): PullRequestContext | undefined {
   const token =
+    process.env.REVIEW_BOT_TOKEN?.trim() ||
     process.env.GH_TOKEN?.trim() ||
     process.env.REVIEW_GITHUB_TOKEN?.trim() ||
     process.env.GITHUB_TOKEN?.trim();
@@ -50,7 +68,13 @@ function pullRequestContext(): PullRequestContext | undefined {
 }
 
 function findingBody(finding: Finding): string {
-  return `[${finding.severity.toUpperCase()}] ${finding.category}\n${finding.summary}\n\n${finding.recommendation}`;
+  return [
+    severityBadge(finding.severity, finding.category),
+    "",
+    finding.summary,
+    "",
+    `**Recommendation:** ${finding.recommendation}`,
+  ].join("\n");
 }
 
 function reviewBody(
@@ -58,18 +82,18 @@ function reviewBody(
   extraFindings: Finding[],
   extraHeading: string,
 ): string {
-  const lines = [`Overall risk: ${review.overallRisk.toUpperCase()}`];
+  const lines = [severityBadge(review.overallRisk, "risk")];
   if (review.testFindings.length > 0) {
     lines.push("", "Test findings:");
     for (const finding of review.testFindings) {
-      lines.push(`- [${finding.severity.toUpperCase()}] ${finding.details}`);
+      lines.push(`- ${severityBadge(finding.severity, "test-failure")} ${finding.details}`);
     }
   }
   if (extraFindings.length > 0) {
     lines.push("", extraHeading);
     for (const finding of extraFindings) {
       lines.push(
-        `- [${finding.severity.toUpperCase()}] ${finding.file}: ${finding.summary}`,
+        `- ${severityBadge(finding.severity, finding.category)} \`${finding.file}\` ${finding.summary}`,
       );
     }
   }
