@@ -1,26 +1,20 @@
-# repo-review (starter)
+# repo-review
 
-CLI code review agent built on Vercel Sandbox. The project for the [Vercel Sandbox course on Vercel Academy](https://vercel.com/academy/vercel-sandbox).
+CLI that reviews a GitHub repository in a Vercel Sandbox, runs its tests, and posts a structured AI review on the pull request. Findings use colored severity badges.
 
-This folder is the scaffold. Dependencies and tooling are set up, and `src/` is empty. You build the CLI lesson by lesson. The finished version lives next door in [`../complete`](../complete) if you get stuck or want to compare.
+## CI/CD
 
-## Setup
+A caller repository runs this review on every pull request by calling the reusable workflow [`.github/workflows/review.yml`](.github/workflows/review.yml). The workflow file has to be on `main` of this repository before another repository can call it.
 
-Requires Node.js 22.12 or later.
+On each pull request the job:
 
-```bash
-pnpm install
-vercel link
-vercel env pull .env
-```
+1. Checks out this CLI from `main` and installs it.
+2. Lists the files changed in the caller pull request.
+3. Starts a Vercel Sandbox, clones that commit, installs dependencies, and runs the test script.
+4. Sends the changed files to `openai/gpt-5.3-codex` and prints the findings in the Action log.
+5. Opens one pull request review. Each changed file with findings gets a comment on the first changed line. Severity is a colored badge: red for critical and high, orange for medium, yellow for low.
 
-`vercel env pull` writes a development OIDC token that authenticates both Sandbox and AI Gateway.
-
-## Run from another repository
-
-Other repositories call the reusable workflow in this repo. Every value to set, locally and in Actions, is listed in [docs/credentials.md](docs/credentials.md).
-
-On a pull request, the workflow reviews that pull request's commit. The sandbox clones the caller, including a private caller, with the workflow's `GITHUB_TOKEN`. Steps to run once when the pull request is opened and to post review comments are in [docs/pr-review-comments.md](docs/pr-review-comments.md).
+The caller workflow needs `contents: read` and `pull-requests: write`. Secrets are listed in [docs/credentials.md](docs/credentials.md).
 
 ```yaml
 name: Code review
@@ -29,6 +23,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   review:
@@ -38,23 +33,35 @@ jobs:
       VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+      REVIEW_BOT_TOKEN: ${{ secrets.REVIEW_BOT_TOKEN }}
 ```
 
-This file has to be on `main` before another repository can call it.
+`REVIEW_BOT_TOKEN` is optional. When it is set to a token for another GitHub account, that account's name is the comment author. Without it, GitHub shows `github-actions[bot]`.
 
-Then head to **Section 1: Sandbox Foundations, Your First Sandbox** in the course and start building.
+![Review comment with severity badges](docs/images/review-comment.jpg)
 
-## What you'll build
+## Local setup
 
-A CLI named `repo-review` that takes a GitHub URL, clones the repo into an isolated Vercel Sandbox, runs the test suite, generates a structured AI review with `openai/gpt-5.3-codex`, and prints a severity-sorted combined report.
+Requires Node.js 22.12 or later.
 
-By the end of the course, `src/` will contain:
+```bash
+pnpm install
+vercel link
+vercel env pull .env
+pnpm review https://github.com/<owner>/<repo>
+```
 
-- `sandbox-lifecycle.ts`: Sandbox creation, clone, file collection, test run
-- `cli.ts`: `commander` setup, URL validation, pipeline orchestration
-- `analyze.ts`: Zod-backed structured AI review with `generateText` and `Output.object`
-- `test-runner.ts`: failure parser and package-manager detection
-- `reporter.ts`: severity-sorted, CI-aware output
+`vercel env pull` writes `VERCEL_OIDC_TOKEN`, which authenticates Sandbox and AI Gateway on your machine. A local run prints the report and does not post pull request comments.
+
+## What the CLI does
+
+`repo-review` takes a public `https://github.com/<owner>/<repo>` URL.
+
+- `sandbox-lifecycle.ts` creates the sandbox, clones the repo, and collects files
+- `test-runner.ts` detects pnpm, npm, or yarn and parses test failures
+- `analyze.ts` returns a structured review with `generateText` and `Output.object`
+- `reporter.ts` prints the severity-sorted report
+- `github-review.ts` publishes the pull request review when the Action provides a pull request number
 
 ## Tech stack
 
