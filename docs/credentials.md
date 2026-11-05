@@ -39,6 +39,7 @@ In the caller repository, open **Settings → Secrets and variables → Actions*
 | `VERCEL_PROJECT_ID` | Yes | `projectId` from `.vercel/project.json` in this reviewer repo. |
 | `AI_GATEWAY_API_KEY` | Yes | AI Gateway key for `openai/gpt-5.3-codex`. |
 | `SANDBOX_SNAPSHOT_ID` | No | Same snapshot id as local, when you want Actions to restore that snapshot. |
+| `REVIEW_BOT_TOKEN` | No | Personal access token, or a GitHub App token, for the account that should author review comments. GitHub shows that account's name. Without this secret, comments are posted as `github-actions[bot]`. The token needs pull request write access on the caller repository. |
 
 Pass them from the caller workflow:
 
@@ -49,6 +50,7 @@ secrets:
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
   AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
   SANDBOX_SNAPSHOT_ID: ${{ secrets.SANDBOX_SNAPSHOT_ID }}
+  REVIEW_BOT_TOKEN: ${{ secrets.REVIEW_BOT_TOKEN }}
 ```
 
 `SANDBOX_SNAPSHOT_ID` can be omitted. The workflow already declares it as optional.

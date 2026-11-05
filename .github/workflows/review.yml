@@ -22,6 +22,8 @@ on:
         required: true
       SANDBOX_SNAPSHOT_ID:
         required: false
+      REVIEW_BOT_TOKEN:
+        required: false
 
 permissions:
   contents: read
@@ -64,6 +66,7 @@ jobs:
           SANDBOX_SNAPSHOT_ID: ${{ secrets.SANDBOX_SNAPSHOT_ID }}
           REVIEW_GITHUB_TOKEN: ${{ github.token }}
           GH_TOKEN: ${{ github.token }}
+          REVIEW_BOT_TOKEN: ${{ secrets.REVIEW_BOT_TOKEN }}
           INPUT_REPO_URL: ${{ inputs.repo_url }}
           INPUT_REVISION: ${{ inputs.revision }}
           CALLER_REPO: ${{ github.repository }}
